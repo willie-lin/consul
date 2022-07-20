@@ -240,7 +240,7 @@ func makePassthroughClusters(cfgSnap *proxycfg.ConfigSnapshot) ([]proto.Message,
 				c.ConnectTimeout = durationpb.New(discoTarget.ConnectTimeout)
 			}
 
-			transportSocket, err := makeMTLSTransportSocket(cfgSnap, uid, uid.Name, sni)
+			transportSocket, err := makeMTLSTransportSocket(cfgSnap, uid, sni)
 			if err != nil {
 				return nil, err
 			}
@@ -282,10 +282,8 @@ func makePassthroughClusters(cfgSnap *proxycfg.ConfigSnapshot) ([]proto.Message,
 				OutlierDetection: &envoy_cluster_v3.OutlierDetection{},
 			}
 
-			// modify the service name so that the SPIFFE name is unique
-			spiffeName := destinationSpecificServiceName(uid.Name, address)
 			// Use the cluster name as the SNI to match on in the terminating gateway
-			transportSocket, err := makeMTLSTransportSocket(cfgSnap, uid, spiffeName, name)
+			transportSocket, err := makeMTLSTransportSocket(cfgSnap, uid, name)
 			if err != nil {
 				return err
 			}
@@ -301,13 +299,13 @@ func makePassthroughClusters(cfgSnap *proxycfg.ConfigSnapshot) ([]proto.Message,
 	return clusters, nil
 }
 
-func makeMTLSTransportSocket(cfgSnap *proxycfg.ConfigSnapshot, uid proxycfg.UpstreamID, serviceName string, sni string) (*envoy_core_v3.TransportSocket, error) {
+func makeMTLSTransportSocket(cfgSnap *proxycfg.ConfigSnapshot, uid proxycfg.UpstreamID, sni string) (*envoy_core_v3.TransportSocket, error) {
 	spiffeID := connect.SpiffeIDService{
 		Host:       cfgSnap.Roots.TrustDomain,
 		Partition:  uid.PartitionOrDefault(),
 		Namespace:  uid.NamespaceOrDefault(),
 		Datacenter: cfgSnap.Datacenter,
-		Service:    serviceName,
+		Service:    uid.Name,
 	}
 
 	commonTLSContext := makeCommonTLSContext(

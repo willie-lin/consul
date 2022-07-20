@@ -226,34 +226,31 @@ func (s *ResourceGenerator) listenersFromSnapshotConnectProxy(cfgSnap *proxycfg.
 			outboundListener.FilterChains = append(outboundListener.FilterChains, filterChain)
 		}
 	}
-	hasDestination := false
+	requiresTLSInspector := false
 
 	err = cfgSnap.ConnectProxy.DestinationsUpstream.ForEachKeyE(func(uid proxycfg.UpstreamID) error {
-		destination, ok := cfgSnap.ConnectProxy.DestinationsUpstream.Get(uid)
-		if !ok || destination == nil {
+		svcConfig, ok := cfgSnap.ConnectProxy.DestinationsUpstream.Get(uid)
+		if !ok || svcConfig == nil {
 			return nil
 		}
 
-		upstreamCfg := cfgSnap.ConnectProxy.UpstreamConfig[uid]
-		cfg := s.getAndModifyUpstreamConfigForListener(uid, upstreamCfg, nil)
-
-		for _, address := range destination.Destination.Addresses {
+		for _, address := range svcConfig.Destination.Addresses {
 			clusterName := clusterNameForDestination(cfgSnap, uid.Name, address, uid.NamespaceOrDefault(), uid.PartitionOrDefault())
-
 			filterChain, err := s.makeUpstreamFilterChain(filterChainOpts{
 				routeName:   uid.EnvoyID(),
 				clusterName: clusterName,
 				filterName:  clusterName,
-				protocol:    cfg.Protocol,
-				useRDS:      cfg.Protocol != "tcp",
+				protocol:    svcConfig.Protocol,
+				useRDS:      structs.IsProtocolHTTPLike(svcConfig.Protocol),
 			})
 			if err != nil {
 				return err
 			}
-			filterChain.FilterChainMatch = makeFilterChainMatchFromAddressWithPort(address, destination.Destination.Port)
+
+			filterChain.FilterChainMatch = makeFilterChainMatchFromAddressWithPort(address, svcConfig.Destination.Port)
 			outboundListener.FilterChains = append(outboundListener.FilterChains, filterChain)
 
-			hasDestination = len(filterChain.FilterChainMatch.ServerNames) != 0 || hasDestination
+			requiresTLSInspector = len(filterChain.FilterChainMatch.ServerNames) != 0 || requiresTLSInspector
 		}
 		return nil
 	})
@@ -261,7 +258,7 @@ func (s *ResourceGenerator) listenersFromSnapshotConnectProxy(cfgSnap *proxycfg.
 		return nil, err
 	}
 
-	if hasDestination {
+	if requiresTLSInspector {
 		tlsInspector, err := makeTLSInspectorListenerFilter()
 		if err != nil {
 			return nil, err
