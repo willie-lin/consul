@@ -60,6 +60,16 @@ as |item index|>
           View
         </BlockSlot>
       </Action>
+{{#if (can "write peer" item=item)}}
+        <Action
+          data-test-edit-action
+          {{on 'click' (fn @onedit item)}}
+        >
+          <BlockSlot @name="label">
+            Regenerate token
+          </BlockSlot>
+        </Action>
+{{/if}}
       <Action
         data-test-delete-action
         @onclick={{fn @ondelete item}}
