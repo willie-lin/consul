@@ -62,7 +62,7 @@ func TestTracker_EnsureConnectedDisconnected(t *testing.T) {
 	})
 
 	testutil.RunStep(t, "disconnect", func(t *testing.T) {
-		tracker.Disconnected(peerID)
+		tracker.DisconnectedGracefully(peerID)
 		sequence++
 
 		expect := Status{
@@ -147,7 +147,7 @@ func TestTracker_connectedStreams(t *testing.T) {
 				require.NoError(t, err)
 
 				// Mark foo as disconnected to avoid showing it as an active stream
-				status.TrackDisconnected()
+				status.TrackDisconnectedGracefully()
 
 				_, err = s.Connected("bar")
 				require.NoError(t, err)

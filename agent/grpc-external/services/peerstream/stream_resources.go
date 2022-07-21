@@ -160,9 +160,19 @@ func (s *Server) DrainStream(req HandleStreamRequest) {
 	}
 }
 
+func (s *Server) HandleStream(streamReq HandleStreamRequest) error {
+	if err := s.realHandleStream(streamReq); err != nil {
+		s.Tracker.DisconnectedDueToError(streamReq.LocalID, err.Error())
+		return err
+	}
+	// TODO(peering) Also need to clear subscriptions associated with the peer
+	s.Tracker.DisconnectedGracefully(streamReq.LocalID)
+	return nil
+}
+
 // The localID provided is the locally-generated identifier for the peering.
 // The remoteID is an identifier that the remote peer recognizes for the peering.
-func (s *Server) HandleStream(streamReq HandleStreamRequest) error {
+func (s *Server) realHandleStream(streamReq HandleStreamRequest) error {
 	// TODO: pass logger down from caller?
 	logger := s.Logger.Named("stream").
 		With("peer_name", streamReq.PeerName).
@@ -174,9 +184,6 @@ func (s *Server) HandleStream(streamReq HandleStreamRequest) error {
 	if err != nil {
 		return fmt.Errorf("failed to register stream: %v", err)
 	}
-
-	// TODO(peering) Also need to clear subscriptions associated with the peer
-	defer s.Tracker.Disconnected(streamReq.LocalID)
 
 	var trustDomain string
 	if s.ConnectEnabled {

@@ -564,6 +564,7 @@ func TestStreamResources_Server_StreamTracker(t *testing.T) {
 
 		expect := Status{
 			Connected:               false,
+			DisconnectErrorMessage:  "stream ended unexpectedly",
 			LastAck:                 lastSendSuccess,
 			LastNack:                lastNack,
 			LastNackMessage:         lastNackMsg,
@@ -868,8 +869,8 @@ func TestStreamResources_Server_CARootUpdates(t *testing.T) {
 	})
 }
 
-// Test that when the client doesn't send a heartbeat in time, the stream is terminated.
-func TestStreamResources_Server_TerminatesOnHeartbeatTimeout(t *testing.T) {
+// Test that when the client doesn't send a heartbeat in time, the stream is disconnected.
+func TestStreamResources_Server_DisconnectsOnHeartbeatTimeout(t *testing.T) {
 	it := incrementalTime{
 		base: time.Date(2000, time.January, 1, 0, 0, 0, 0, time.UTC),
 	}
@@ -905,10 +906,13 @@ func TestStreamResources_Server_TerminatesOnHeartbeatTimeout(t *testing.T) {
 	})
 
 	testutil.RunStep(t, "stream is disconnected due to heartbeat timeout", func(t *testing.T) {
+		disconnectTime := it.FutureNow(1)
 		retry.Run(t, func(r *retry.R) {
 			status, ok := srv.StreamStatus(peerID)
 			require.True(r, ok)
-			require.False(r, status.Connected)
+			require.Equal(r, false, status.Connected)
+			require.Equal(r, "heartbeat timeout", status.DisconnectErrorMessage)
+			require.Equal(r, disconnectTime, status.DisconnectTime)
 		})
 	})
 }

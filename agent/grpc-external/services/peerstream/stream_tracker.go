@@ -75,13 +75,23 @@ func (t *Tracker) connectedLocked(id string) (*MutableStatus, error) {
 	return status, nil
 }
 
-// Disconnected ensures that if a peer id's stream status is tracked, it is marked as disconnected.
-func (t *Tracker) Disconnected(id string) {
+// DisconnectedGracefully ensures that if a peer id's stream status is tracked, it is marked as disconnected.
+func (t *Tracker) DisconnectedGracefully(id string) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	if status, ok := t.streams[id]; ok {
-		status.TrackDisconnected()
+		status.TrackDisconnectedGracefully()
+	}
+}
+
+// todo
+func (t *Tracker) DisconnectedDueToError(id string, error string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if status, ok := t.streams[id]; ok {
+		status.TrackDisconnectedDueToError(error)
 	}
 }
 
@@ -134,6 +144,9 @@ type MutableStatus struct {
 type Status struct {
 	// Connected is true when there is an open stream for the peer.
 	Connected bool
+
+	// todo
+	DisconnectErrorMessage string
 
 	// If the status is not connected, DisconnectTime tracks when the stream was closed. Else it's zero.
 	DisconnectTime time.Time
@@ -235,10 +248,19 @@ func (s *MutableStatus) TrackConnected() {
 	s.mu.Unlock()
 }
 
-func (s *MutableStatus) TrackDisconnected() {
+func (s *MutableStatus) TrackDisconnectedGracefully() {
 	s.mu.Lock()
 	s.Connected = false
 	s.DisconnectTime = s.timeNow().UTC()
+	s.DisconnectErrorMessage = ""
+	s.mu.Unlock()
+}
+
+func (s *MutableStatus) TrackDisconnectedDueToError(error string) {
+	s.mu.Lock()
+	s.Connected = false
+	s.DisconnectTime = s.timeNow().UTC()
+	s.DisconnectErrorMessage = error
 	s.mu.Unlock()
 }
 
